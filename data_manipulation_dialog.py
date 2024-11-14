@@ -1,5 +1,6 @@
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QLabel, QScrollArea, QWidget, QTableWidget, QTableWidgetItem, QFileDialog, QMessageBox, QInputDialog, QApplication
+from PyQt5.QtGui import QClipboard
 import pandas as pd
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QInputDialog
 
 class DataManipulationDialog(QDialog):
     def __init__(self, parent=None):
@@ -40,44 +41,159 @@ class DataManipulationDialog(QDialog):
             self.parent.update_total_pages()
             self.parent.display_data()
             QMessageBox.information(self, "Import Successful", "Dataset imported successfully.")
-
-    def show_description(self):
-        if self.parent.full_data is not None:
-            description = self.parent.full_data.describe().to_string()
-            QMessageBox.information(self, "Dataset Description", description)
-        else:
-            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
-
+    
     def update_instance(self):
-        if self.parent.full_data is not None:
-            row, ok = QInputDialog.getInt(self, "Update Row", "Enter row number to update:", 0, 0, len(self.parent.full_data) - 1)
-            if ok:
-                column, ok = QInputDialog.getItem(self, "Update Column", "Choose column:", self.parent.full_data.columns.tolist(), 0, False)
+        
+            if self.parent.full_data is not None:
+                # Get the row index to update
+                row, ok = QInputDialog.getInt(self, "Update Row", "Enter row number to update:", 0, 0, len(self.parent.full_data) - 1)
                 if ok:
-                    new_value, ok = QInputDialog.getText(self, "New Value", f"Enter new value for {column} at row {row}:")
+                    # Get the column name to update
+                    column, ok = QInputDialog.getItem(self, "Update Column", "Choose column:", self.parent.full_data.columns.tolist(), 0, False)
                     if ok:
-                        self.parent.full_data.at[row, column] = new_value
-                        self.parent.display_data()
-                        QMessageBox.information(self, "Update Successful", f"Row {row} updated successfully.")
-        else:
-            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
+                        # Get the new value for the cell
+                        new_value, ok = QInputDialog.getText(self, "New Value", f"Enter new value for {column} at row {row}:")
+                        if ok:
+                            # Update the dataset with the new value
+                            self.parent.full_data.at[row, column] = new_value
+                            self.parent.display_data()
+                            QMessageBox.information(self, "Update Successful", f"Row {row} updated successfully.")
+            else:
+                QMessageBox.warning(self, "No Data", "Please import a dataset first.")    
 
     def delete_instance(self):
+        """Deletes a specific row from the dataset."""
         if self.parent.full_data is not None:
+            # Prompt the user to select a row to delete
             row, ok = QInputDialog.getInt(self, "Delete Row", "Enter row number to delete:", 0, 0, len(self.parent.full_data) - 1)
             if ok:
-                self.parent.full_data.drop(row, inplace=True)
+                # Drop the selected row and reset the index
+                self.parent.full_data.drop(index=row, inplace=True)
                 self.parent.full_data.reset_index(drop=True, inplace=True)
                 self.parent.display_data()
                 QMessageBox.information(self, "Delete Successful", f"Row {row} deleted successfully.")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")
-
     def save_data(self):
+        """Saves the current dataset to a CSV file."""
         if self.parent.full_data is not None:
+            # Prompt the user to select a location and name for the CSV file
             save_path, _ = QFileDialog.getSaveFileName(self, "Save CSV File", "", "CSV Files (*.csv);;All Files (*)")
             if save_path:
-                self.parent.full_data.to_csv(save_path, index=False)
-                QMessageBox.information(self, "Save Successful", "Dataset saved successfully.")
+                try:
+                    # Save the DataFrame to the specified path
+                    self.parent.full_data.to_csv(save_path, index=False)
+                    QMessageBox.information(self, "Save Successful", "Dataset saved successfully.")
+                except Exception as e:
+                    QMessageBox.warning(self, "Save Error", f"An error occurred while saving the file: {e}")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")
+
+    def show_description(self):
+        if self.parent.full_data is not None:
+            data = self.parent.full_data
+            
+            # Overview Table
+            overview = pd.DataFrame({
+                "Column Name": data.columns,
+                "Data Type": data.dtypes,
+                "Missing Values": data.isnull().sum(),
+                "Unique Values": data.nunique()
+            })
+            overview['Column Name'] = overview['Column Name'].astype(str)
+            overview['Data Type'] = overview['Data Type'].astype(str)
+            overview_summary = f"Dataset contains {data.shape[0]} rows and {data.shape[1]} columns."
+
+            # Statistical Summary
+            numeric_data = data.select_dtypes(include=['number'])
+            stats = pd.DataFrame({
+                "Mean": numeric_data.mean(),
+                "Median": numeric_data.median(),
+                "Mode": numeric_data.mode().iloc[0],
+                "Std Dev": numeric_data.std(),
+                "Min": numeric_data.min(),
+                "Max": numeric_data.max()
+            })
+
+            # Creating the Scrollable Window with Tables
+            self.description_window = QDialog(self)
+            self.description_window.setWindowTitle("Dataset Description")
+            self.description_window.setGeometry(100, 100, 900, 600)
+            desc_layout = QVBoxLayout()
+
+            # Overview Label
+            overview_label = QLabel(overview_summary)
+            desc_layout.addWidget(overview_label)
+
+            # Display Overview Table
+            self.overview_table = self.create_table_from_df(overview, "Overview")
+            desc_layout.addWidget(self.overview_table)
+
+            # Display Statistics Table
+            self.stats_table = self.create_table_from_df(stats, "Statistics")
+            desc_layout.addWidget(self.stats_table)
+
+            # Copy button to copy table data
+            copy_button = QPushButton("Copy Selected Table")
+            copy_button.clicked.connect(self.copy_table)
+            desc_layout.addWidget(copy_button)
+
+            # Adding layout to scrollable area
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll_content = QWidget()
+            scroll_content.setLayout(desc_layout)
+            scroll.setWidget(scroll_content)
+
+            # Setting main layout
+            main_layout = QVBoxLayout()
+            main_layout.addWidget(scroll)
+            self.description_window.setLayout(main_layout)
+            self.description_window.exec_()
+        else:
+            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
+
+    def create_table_from_df(self, df, title):
+        """Creates a QTableWidget from a DataFrame."""
+        table = QTableWidget()
+        table.setRowCount(df.shape[0])
+        table.setColumnCount(df.shape[1])
+        table.setHorizontalHeaderLabels(df.columns)
+
+        # Populate the table with data
+        for i in range(df.shape[0]):
+            for j in range(df.shape[1]):
+                table.setItem(i, j, QTableWidgetItem(str(df.iat[i, j])))
+
+        table.setWindowTitle(title)
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        return table
+
+    def copy_table(self):
+        """Copies selected cells from the currently selected table to the clipboard."""
+        # Determine which table has a selected range
+        table = None
+        if self.overview_table.selectedRanges():
+            table = self.overview_table
+        elif self.stats_table.selectedRanges():
+            table = self.stats_table
+        
+        if table is None:
+            QMessageBox.warning(self, "No Table Selected", "Please select a table and a range of cells to copy.")
+            return
+
+        # Collect data from the selected cells
+        selected_data = ""
+        for selected_range in table.selectedRanges():
+            for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
+                row_data = []
+                for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
+                    item = table.item(row, col)
+                    row_data.append(item.text() if item else "")
+                selected_data += "\t".join(row_data) + "\n"
+
+        # Copy selected data to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setText(selected_data)
+        QMessageBox.information(self, "Copy Complete", "Selected table data has been copied to the clipboard.")

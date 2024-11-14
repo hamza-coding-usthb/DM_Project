@@ -44,6 +44,7 @@ class CsvViewer(QMainWindow):
             ("Data Merger", self.open_data_merger),
             ("Data Discretization", self.open_data_discretization),
             ("Data Visualization", self.open_data_visualization),
+            ("Copy Selection", self.copy_selection),  
         ]
         for text, func in buttons:
             button = QPushButton(text)
@@ -58,6 +59,8 @@ class CsvViewer(QMainWindow):
         data_display_area = QWidget()
         data_layout = QVBoxLayout(data_display_area)
         self.table = QTableWidget()
+        self.table.setSelectionBehavior(QTableWidget.SelectItems)  # Allows cell-by-cell selection
+        self.table.setSelectionMode(QTableWidget.ExtendedSelection)  # Allows multi-cell selection
         data_layout.addWidget(self.table)
 
         # Pagination controls
@@ -90,6 +93,26 @@ class CsvViewer(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
         self.apply_styles()
+    def copy_selection(self):
+        """Copies selected cells to the clipboard."""
+        selected_ranges = self.table.selectedRanges()
+        if not selected_ranges:
+            QMessageBox.warning(self, "No Selection", "Please select a section of the data to copy.")
+            return
+
+        selected_data = ""
+        for range_ in selected_ranges:
+            for row in range(range_.topRow(), range_.bottomRow() + 1):
+                row_data = []
+                for col in range(range_.leftColumn(), range_.rightColumn() + 1):
+                    item = self.table.item(row, col)
+                    row_data.append(item.text() if item else "")
+                selected_data += "\t".join(row_data) + "\n"
+
+        # Copy to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setText(selected_data)
+        QMessageBox.information(self, "Copy Complete", "Selected data has been copied to the clipboard.")
 
     def apply_styles(self):
         self.setStyleSheet("""

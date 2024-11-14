@@ -20,10 +20,37 @@ class DataAggregationDialog(QDialog):
         self.seasonal_button = QPushButton("Aggregate Seasonally")
         self.seasonal_button.clicked.connect(self.aggregate_seasonally)
         layout.addWidget(self.seasonal_button)
-
+         # Add a button for the new reduction option
+        self.reduction_button = QPushButton("Reduce Data by Season")
+        self.reduction_button.clicked.connect(self.reduce_data_by_season)
+        layout.addWidget(self.reduction_button)
         # Set dialog layout
         self.setLayout(layout)
+    def reduce_data_by_season(self):
+        if self.parent.full_data is not None:
+            try:
+                # Pivot the data based on 'latitude', 'longitude', and 'season'
+                pivot_df = self.parent.full_data.pivot(index=['latitude', 'longitude'], 
+                                                       columns='season',
+                                                       values=['PSurf', 'Qair', 'Rainf', 'Snowf', 'Tair', 'Wind'])
 
+                # Flatten the MultiIndex columns
+                pivot_df.columns = [f"{var}{season}" for var, season in pivot_df.columns]
+                
+                # Reset index to make it compatible with the main data frame
+                pivot_df.reset_index(inplace=True)
+
+                # Update the main data with the reduced form
+                self.parent.full_data = pivot_df
+                self.parent.current_page = 0
+                self.parent.update_total_pages()
+                self.parent.display_data()
+
+                QMessageBox.information(self, "Reduction Complete", "Data has been reduced by season and displayed.")
+            except Exception as e:
+                QMessageBox.warning(self, "Reduction Error", f"An error occurred during data reduction: {e}")
+        else:
+            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
     def ensure_datetime(self):
         """Ensure that the 'time' column is in datetime format."""
         if 'time' in self.parent.full_data.columns:
