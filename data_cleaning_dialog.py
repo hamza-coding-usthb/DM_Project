@@ -6,7 +6,7 @@ class DataCleaningDialog(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Data Cleaning")
-        self.setGeometry(200, 200, 400, 300)
+        self.setGeometry(200, 200, 400, 350)  # Adjust height to fit the new button
 
         # Layout for the data cleaning options
         layout = QVBoxLayout()
@@ -27,6 +27,11 @@ class DataCleaningDialog(QDialog):
         self.cap_outliers_button = QPushButton("Cap Outliers")
         self.cap_outliers_button.clicked.connect(self.cap_outliers)
         layout.addWidget(self.cap_outliers_button)
+
+        # Add button to remove rows with NaN values
+        self.remove_nan_button = QPushButton("Remove Rows with NaN")
+        self.remove_nan_button.clicked.connect(self.remove_nan_rows)
+        layout.addWidget(self.remove_nan_button)
 
         self.setLayout(layout)
 
@@ -95,5 +100,20 @@ class DataCleaningDialog(QDialog):
             self.parent.update_total_pages()
             self.parent.display_data()
             QMessageBox.information(self, "Outliers Capped", "Outliers have been capped to the 5th and 95th percentiles.")
+        else:
+            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
+
+    def remove_nan_rows(self):
+        """Removes rows containing NaN values."""
+        if self.parent.full_data is not None:
+            initial_rows = len(self.parent.full_data)
+            self.parent.full_data = self.parent.full_data.dropna()
+            final_rows = len(self.parent.full_data)
+            removed_rows = initial_rows - final_rows
+
+            self.parent.current_page = 0
+            self.parent.update_total_pages()
+            self.parent.display_data()
+            QMessageBox.information(self, "NaN Rows Removed", f"{removed_rows} rows with NaN values have been removed.")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")

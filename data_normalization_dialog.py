@@ -28,7 +28,7 @@ class DataNormalizationDialog(QDialog):
     def apply_min_max_normalization(self):
         if self.parent.full_data is not None:
             # Exclude columns named 'time', 'latitude', 'longitude' for Min-Max normalization
-            columns_to_normalize = self.parent.full_data.columns.difference(['time', 'latitude', 'longitude'])
+            columns_to_normalize = self.parent.full_data.columns.difference(['time', 'latitude', 'longitude', 'geometry'])
             data_normalized = self.parent.full_data.copy()
             non_normalized_columns = []
 
@@ -60,7 +60,7 @@ class DataNormalizationDialog(QDialog):
     def apply_zscore_normalization(self):
         if self.parent.full_data is not None:
             # Exclude columns named 'time', 'latitude', 'longitude' for Z-score normalization
-            columns_to_normalize = self.parent.full_data.columns.difference(['time', 'latitude', 'longitude'])
+            columns_to_normalize = self.parent.full_data.columns.difference(['time', 'latitude', 'longitude', 'geometry'])
             data_normalized = self.parent.full_data.copy()
             non_normalized_columns = []
 
