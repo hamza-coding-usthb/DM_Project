@@ -20,11 +20,7 @@ class DataDiscretizationDialog(QDialog):
         self.equal_frequency_button.clicked.connect(self.equal_frequency_discretization)
         layout.addWidget(self.equal_frequency_button)
 
-        # Existing buttons
-        self.time_discretization_button = QPushButton("Discretize by Time")
-        self.time_discretization_button.clicked.connect(self.discretize_by_time)
-        layout.addWidget(self.time_discretization_button)
-
+        # Button for discretizing by coordinates
         self.coord_discretization_button = QPushButton("Discretize by Coordinates")
         self.coord_discretization_button.clicked.connect(self.discretize_by_coordinates)
         layout.addWidget(self.coord_discretization_button)
@@ -34,11 +30,14 @@ class DataDiscretizationDialog(QDialog):
 
     def equal_width_discretization(self):
         if self.parent.full_data is not None:
-            column, ok = QInputDialog.getItem(self, "Select Column", "Choose column for equal width discretization:", 
-                                              self.parent.full_data.columns.tolist(), 0, False)
+            column, ok = QInputDialog.getItem(
+                self, "Select Column", "Choose column for equal width discretization:", 
+                self.parent.full_data.columns.tolist(), 0, False
+            )
             if ok:
                 bins, ok = QInputDialog.getInt(self, "Number of Bins", "Enter the number of bins:", 5, 2, 100)
                 if ok:
+                    # Perform equal-width discretization
                     self.parent.full_data[column + "_width_bin"] = pd.cut(self.parent.full_data[column], bins=bins)
                     self.parent.display_data()
                     QMessageBox.information(self, "Discretization Complete", "Equal width discretization applied.")
@@ -47,42 +46,53 @@ class DataDiscretizationDialog(QDialog):
 
     def equal_frequency_discretization(self):
         if self.parent.full_data is not None:
-            column, ok = QInputDialog.getItem(self, "Select Column", "Choose column for equal frequency discretization:", 
-                                              self.parent.full_data.columns.tolist(), 0, False)
+            column, ok = QInputDialog.getItem(
+                self, "Select Column", "Choose column for equal frequency discretization:", 
+                self.parent.full_data.columns.tolist(), 0, False
+            )
             if ok:
                 bins, ok = QInputDialog.getInt(self, "Number of Bins", "Enter the number of bins:", 5, 2, 100)
                 if ok:
+                    # Perform equal-frequency discretization
                     self.parent.full_data[column + "_freq_bin"] = pd.qcut(self.parent.full_data[column], q=bins)
                     self.parent.display_data()
                     QMessageBox.information(self, "Discretization Complete", "Equal frequency discretization applied.")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")
-    def discretize_by_time(self):
-        if self.parent.full_data is not None:
-            if 'time' in self.parent.full_data.columns:
-                # Convert 'time' column to datetime if it isn't already
-                self.parent.full_data['time'] = pd.to_datetime(self.parent.full_data['time'], errors='coerce')
-                # Discretize time into monthly intervals
-                self.parent.full_data['year_month'] = self.parent.full_data['time'].dt.to_period('M')
-                self.parent.display_data()
-                QMessageBox.information(self, "Discretization Complete", "Data has been discretized by monthly time intervals.")
-            else:
-                QMessageBox.warning(self, "Missing 'time' Column", "The data must have a 'time' column.")
-        else:
-            QMessageBox.warning(self, "No Data", "Please import a dataset first.")
+
     def discretize_by_coordinates(self):
         if self.parent.full_data is not None:
-            # Define latitude and longitude bins (adjust intervals as needed)
-            lat_bins = pd.interval_range(start=-90, end=90, freq=10)
-            lon_bins = pd.interval_range(start=-180, end=180, freq=10)
+            # Ensure 'latitude' and 'longitude' columns exist
+            if 'latitude' in self.parent.full_data.columns and 'longitude' in self.parent.full_data.columns:
+                
+                # Determine min and max for latitude and longitude from the dataset
+                min_lat, max_lat = self.parent.full_data['latitude'].min(), self.parent.full_data['latitude'].max()
+                min_lon, max_lon = self.parent.full_data['longitude'].min(), self.parent.full_data['longitude'].max()
 
-            # Discretize latitude and longitude
-            self.parent.full_data['lat_bin'] = pd.cut(self.parent.full_data['latitude'], bins=lat_bins)
-            self.parent.full_data['lon_bin'] = pd.cut(self.parent.full_data['longitude'], bins=lon_bins)
+                # Prompt user for the number of intervals (bins)
+                num_bins, ok = QInputDialog.getInt(self, "Number of Bins", "Enter the number of bins:", 5, 2, 100)
+                if not ok:
+                    return
+                
+                # Define latitude and longitude bins within dataset-specific ranges
+                lat_bins = pd.interval_range(start=min_lat, end=max_lat, freq=(max_lat - min_lat) / num_bins)
+                lon_bins = pd.interval_range(start=min_lon, end=max_lon, freq=(max_lon - min_lon) / num_bins)
 
-            # Update the table display
-            self.parent.display_data()
-            QMessageBox.information(self, "Discretization Complete", "Data has been discretized by spatial coordinates.")
+                # Discretize latitude and longitude columns based on calculated intervals
+                self.parent.full_data['lat_bin'] = pd.cut(self.parent.full_data['latitude'], bins=lat_bins)
+                self.parent.full_data['lon_bin'] = pd.cut(self.parent.full_data['longitude'], bins=lon_bins)
+
+                # Group by the new lat_bin and lon_bin intervals and calculate the mean of other columns
+                grouped_data = self.parent.full_data.groupby(['lat_bin', 'lon_bin']).mean(numeric_only=True).reset_index()
+
+                # Update the main data with the aggregated data
+                self.parent.full_data = grouped_data
+                self.parent.current_page = 0
+                self.parent.update_total_pages()
+                self.parent.display_data()
+
+                QMessageBox.information(self, "Discretization Complete", "Data has been discretized by spatial coordinates and aggregated.")
+            else:
+                QMessageBox.warning(self, "Missing Columns", "The dataset must contain 'latitude' and 'longitude' columns.")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")
-
