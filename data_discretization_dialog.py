@@ -36,7 +36,7 @@ class DataDiscretizationDialog(QDialog):
             return ["All Numerical Columns"] + valid_columns
         return []
 
-    def apply_discretization(self, column, method, bins, labels):
+    def apply_discretization(self, column, method, bins, labels, display_intervals=False):
         """
         Apply the specified discretization method to the given column(s).
         """
@@ -47,24 +47,38 @@ class DataDiscretizationDialog(QDialog):
             for col in self.get_column_options()[1:]:
                 try:
                     if method == "equal_width":
-                        updated_data[col] = pd.cut(updated_data[col], bins=bins, labels=labels)
+                        discretized = pd.cut(updated_data[col], bins=bins)
                     elif method == "equal_frequency":
-                        updated_data[col] = pd.qcut(updated_data[col], q=bins, labels=labels)
+                        discretized = pd.qcut(updated_data[col], q=bins)
+
+                    # Map to intervals or categorical labels
+                    if display_intervals:
+                        updated_data[col] = discretized
+                    else:
+                        updated_data[col] = discretized.apply(lambda x: labels[discretized.cat.categories.tolist().index(x)])
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"An error occurred while discretizing '{col}': {e}")
         else:
             # Apply discretization to a single column
             try:
                 if method == "equal_width":
-                    updated_data[column] = pd.cut(updated_data[column], bins=bins, labels=labels)
+                    discretized = pd.cut(updated_data[column], bins=bins)
                 elif method == "equal_frequency":
-                    updated_data[column] = pd.qcut(updated_data[column], q=bins, labels=labels)
+                    discretized = pd.qcut(updated_data[column], q=bins)
+
+                # Map to intervals or categorical labels
+                if display_intervals:
+                    updated_data[column] = discretized
+                else:
+                    updated_data[column] = discretized.apply(lambda x: labels[discretized.cat.categories.tolist().index(x)])
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"An error occurred while discretizing '{column}': {e}")
 
         # Update the parent table display with the modified data
         self.parent.full_data = updated_data  # Replace the full_data with the updated one
         self.parent.display_data()  # Refresh the displayed data to show the new table
+
+
 
     def equal_width_discretization(self):
         if self.parent.full_data is not None:
@@ -77,14 +91,29 @@ class DataDiscretizationDialog(QDialog):
                 False
             )
             if ok:
-                # Perform equal-width discretization into 5 fixed bins
-                try:
-                    bins = 5  # Fixed number of bins
-                    labels = ["Very Low", "Low", "Average", "High", "Very High"]
-                    self.apply_discretization(column, method="equal_width", bins=bins, labels=labels)
-                    QMessageBox.information(self, "Discretization Complete", "Equal width discretization applied.")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"An error occurred during discretization: {e}")
+                # Ask the user if they want intervals or categorical labels
+                display_intervals, ok = QInputDialog.getItem(
+                    self,
+                    "Display Format",
+                    "Choose display format:",
+                    ["Intervals", "Categorical Labels (Very Low to Very High)"],
+                    0,
+                    False
+                )
+                if ok:
+                    try:
+                        bins = 5  # Fixed number of bins
+                        labels = ["Very Low", "Low", "Medium", "High", "Very High"]
+                        self.apply_discretization(
+                            column,
+                            method="equal_width",
+                            bins=bins,
+                            labels=labels,
+                            display_intervals=(display_intervals == "Intervals")
+                        )
+                        QMessageBox.information(self, "Discretization Complete", "Equal width discretization applied.")
+                    except Exception as e:
+                        QMessageBox.critical(self, "Error", f"An error occurred during discretization: {e}")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")
 
@@ -99,13 +128,28 @@ class DataDiscretizationDialog(QDialog):
                 False
             )
             if ok:
-                # Perform equal-frequency discretization into 5 fixed bins
-                try:
-                    bins = 5  # Fixed number of bins
-                    labels = ["Very Low", "Low", "Average", "High", "Very High"]
-                    self.apply_discretization(column, method="equal_frequency", bins=bins, labels=labels)
-                    QMessageBox.information(self, "Discretization Complete", "Equal frequency discretization applied.")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"An error occurred during discretization: {e}")
+                # Ask the user if they want intervals or categorical labels
+                display_intervals, ok = QInputDialog.getItem(
+                    self,
+                    "Display Format",
+                    "Choose display format:",
+                    ["Intervals", "Categorical Labels (Very Low to Very High)"],
+                    0,
+                    False
+                )
+                if ok:
+                    try:
+                        bins = 5  # Fixed number of bins
+                        labels = ["Very Low", "Low", "Medium", "High", "Very High"]
+                        self.apply_discretization(
+                            column,
+                            method="equal_frequency",
+                            bins=bins,
+                            labels=labels,
+                            display_intervals=(display_intervals == "Intervals")
+                        )
+                        QMessageBox.information(self, "Discretization Complete", "Equal frequency discretization applied.")
+                    except Exception as e:
+                        QMessageBox.critical(self, "Error", f"An error occurred during discretization: {e}")
         else:
             QMessageBox.warning(self, "No Data", "Please import a dataset first.")

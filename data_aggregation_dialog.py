@@ -97,19 +97,19 @@ class DataAggregationDialog(QDialog):
             if not self.ensure_datetime():
                 return
 
-            # Define a function to map months to seasons
-            def get_season(month):
-                if month in [12, 1, 2]:
+            # Define the official seasonal boundaries
+            def get_season(date):
+                if date >= pd.Timestamp(f"{date.year}-12-21") or date < pd.Timestamp(f"{date.year}-03-21"):
                     return 'Winter'
-                elif month in [3, 4, 5]:
+                elif pd.Timestamp(f"{date.year}-03-21") <= date < pd.Timestamp(f"{date.year}-06-21"):
                     return 'Spring'
-                elif month in [6, 7, 8]:
+                elif pd.Timestamp(f"{date.year}-06-21") <= date < pd.Timestamp(f"{date.year}-09-23"):
                     return 'Summer'
-                elif month in [9, 10, 11]:
+                elif pd.Timestamp(f"{date.year}-09-23") <= date < pd.Timestamp(f"{date.year}-12-21"):
                     return 'Fall'
 
-            # Map months to seasons and add a 'season' column
-            self.parent.full_data['season'] = self.parent.full_data['time'].dt.month.map(get_season)
+            # Map precise date ranges to seasons and add a 'season' column
+            self.parent.full_data['season'] = self.parent.full_data['time'].apply(get_season)
 
             # Perform seasonal aggregation
             seasonal_data = self.parent.full_data.groupby(['latitude', 'longitude', 'season']).mean(numeric_only=True).reset_index()
@@ -120,4 +120,4 @@ class DataAggregationDialog(QDialog):
             self.parent.update_total_pages()
             self.parent.display_data()
 
-            QMessageBox.information(self, "Aggregation Complete", "Data has been aggregated seasonally and displayed.")
+            QMessageBox.information(self, "Aggregation Complete", "Data has been aggregated seasonally based on precise boundaries and displayed.")
